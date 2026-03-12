@@ -3,8 +3,8 @@ from typing import Optional, List
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ....core.database import get_db
-from ....core.auth import get_current_user
+from ....database import get_db
+from ....core.auth_dependency import get_current_user
 from ....models.user import User
 from ....services.organization_service import OrganizationService
 from ....schemas.organization import (

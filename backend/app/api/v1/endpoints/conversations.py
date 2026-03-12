@@ -3,11 +3,13 @@ from fastapi.responses import StreamingResponse
 from typing import Optional, List
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import json
 
-from ....core.database import get_db
-from ....core.auth import get_current_user
+from ....database import get_db
+from ....core.auth_dependency import get_current_user
 from ....models.user import User
+from ....models.organization import UserOrganization
 from ....services.conversation_service import ConversationService
 from ....schemas.conversation import (
     ConversationCreate, ConversationUpdate, ConversationResponse,
@@ -21,6 +23,7 @@ from ....core.exceptions import (
     ConversationNotFoundError, ConversationPermissionError,
     ConversationValidationError, MessageNotFoundError
 )
+from ....core.tenant_guard import ensure_org_access
 
 router = APIRouter()
 
@@ -99,12 +102,24 @@ async def get_conversation(
     """Get conversation by ID"""
     try:
         conversation_service = ConversationService(db)
-        return await conversation_service.get_conversation(
+        conversation = await conversation_service.get_conversation(
             conversation_id=conversation_id,
             user_id=current_user.id,
             include_messages=include_messages,
             message_limit=message_limit
         )
+        membership_result = await db.execute(
+            select(UserOrganization.organization_id).where(
+                UserOrganization.user_id == current_user.id,
+                UserOrganization.organization_id == conversation.organization_id,
+                UserOrganization.is_active == True
+            )
+        )
+        ensure_org_access(
+            conversation.organization_id,
+            membership_result.scalar_one_or_none()
+        )
+        return conversation
     except ConversationNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

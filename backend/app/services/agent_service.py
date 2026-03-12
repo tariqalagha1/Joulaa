@@ -47,24 +47,39 @@ class AgentService:
             
             # Validate agent configuration
             await self._validate_agent_config(agent_data)
+
+            config_obj = agent_data.configuration
+            config_dict = config_obj.dict() if hasattr(config_obj, "dict") else (config_obj or {})
+            llm_provider = config_dict.get("llm_provider", "anthropic")
+            llm_model = config_dict.get("llm_model", "claude-3-sonnet")
+            system_prompt_ar = config_dict.get("system_prompt_ar")
+            system_prompt_en = config_dict.get("system_prompt_en")
+            max_tokens = str(config_dict.get("max_tokens", 4000))
+            temperature = str(config_dict.get("temperature", 0.7))
             
             # Create agent instance
             agent = AIAgent(
                 id=uuid4(),
-                name=agent_data.name,
-                description=agent_data.description,
+                name_ar=agent_data.name_ar,
+                name_en=agent_data.name_en,
+                description_ar=agent_data.description_ar,
+                description_en=agent_data.description_en,
                 agent_type=agent_data.agent_type,
-                capabilities=agent_data.capabilities or [],
-                llm_provider=agent_data.llm_provider or "openai",
-                llm_model=agent_data.llm_model,
-                system_prompt_ar=agent_data.system_prompt_ar,
-                system_prompt_en=agent_data.system_prompt_en,
-                temperature=agent_data.temperature or 0.7,
-                max_tokens=agent_data.max_tokens or 4000,
-                configuration=agent_data.configuration or {},
-                integrations=agent_data.integrations or {},
-                permissions=agent_data.permissions or {},
+                capabilities=[cap.value if hasattr(cap, "value") else cap for cap in (agent_data.capabilities or [])],
+                llm_provider=llm_provider,
+                llm_model=llm_model,
+                system_prompt_ar=system_prompt_ar,
+                system_prompt_en=system_prompt_en,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                configuration=config_dict,
+                integrations=[item.dict() if hasattr(item, "dict") else item for item in (agent_data.integrations or [])],
+                permissions=agent_data.permissions.dict() if hasattr(agent_data.permissions, "dict") else (agent_data.permissions or {}),
+                prompt_templates=agent_data.prompt_templates or {},
+                response_templates=agent_data.response_templates or {},
+                allowed_actions=getattr(agent_data.permissions, "allowed_actions", []) if agent_data.permissions else [],
                 is_active=True,
+                is_public=agent_data.is_public,
                 status=AgentStatus.ACTIVE,
                 created_by=user_id,
                 organization_id=organization_id,
@@ -76,14 +91,11 @@ class AgentService:
             await self.db.commit()
             await self.db.refresh(agent)
             
-            # Create initial metrics
-            await self._create_agent_metrics(agent.id)
-            
             logger.info(
                 "Agent created successfully",
                 agent_id=agent.id,
-                agent_name=agent.name,
-                agent_type=agent.agent_type.value,
+                agent_name=agent.name_ar or agent.name_en,
+                agent_type=str(agent.agent_type),
                 created_by=user_id,
                 organization_id=organization_id
             )
@@ -95,7 +107,7 @@ class AgentService:
             logger.error(
                 "Failed to create agent",
                 error=str(e),
-                agent_name=agent_data.name,
+                agent_name=agent_data.name_ar,
                 user_id=user_id,
                 organization_id=organization_id,
                 exc_info=True
@@ -139,7 +151,8 @@ class AgentService:
             response = AgentDetailResponse.from_orm(agent)
             if metrics:
                 response.metrics = AgentMetricsResponse.from_orm(metrics)
-            response.recent_conversations = recent_conversations
+            if hasattr(response, "recent_conversations"):
+                response.recent_conversations = recent_conversations
             
             return response
             
@@ -186,8 +199,10 @@ class AgentService:
             
             if search:
                 search_filter = or_(
-                    AIAgent.name.ilike(f"%{search}%"),
-                    AIAgent.description.ilike(f"%{search}%")
+                    AIAgent.name_ar.ilike(f"%{search}%"),
+                    AIAgent.name_en.ilike(f"%{search}%"),
+                    AIAgent.description_ar.ilike(f"%{search}%"),
+                    AIAgent.description_en.ilike(f"%{search}%"),
                 )
                 query = query.where(search_filter)
             
@@ -214,8 +229,9 @@ class AgentService:
                 agents=agent_responses,
                 total=total,
                 page=page,
-                page_size=page_size,
-                total_pages=(total + page_size - 1) // page_size
+                size=page_size,
+                has_next=(page * page_size) < total,
+                has_prev=page > 1,
             )
             
         except Exception as e:
@@ -323,10 +339,13 @@ class AgentService:
                         f"Cannot delete agent with {active_conversations} active conversations. Use force=True to override."
                     )
             
+            soft_delete_flag = getattr(FeatureFlag, "SOFT_DELETE", None)
+            soft_delete_enabled = is_feature_enabled(soft_delete_flag) if soft_delete_flag is not None else True
+
             # Soft delete by default
-            if is_feature_enabled(FeatureFlag.SOFT_DELETE):
+            if soft_delete_enabled:
                 agent.is_active = False
-                agent.status = AgentStatus.DELETED
+                agent.status = AgentStatus.INACTIVE
                 agent.updated_at = datetime.utcnow()
                 await self.db.commit()
             else:
@@ -339,7 +358,7 @@ class AgentService:
                 agent_id=agent_id,
                 deleted_by=user_id,
                 force_delete=force,
-                soft_delete=is_feature_enabled(FeatureFlag.SOFT_DELETE)
+                soft_delete=soft_delete_enabled
             )
             
             return True
@@ -507,7 +526,8 @@ class AgentService:
     
     async def _check_agent_limits(self, organization_id: UUID) -> None:
         """Check if organization has reached agent creation limits"""
-        if not is_feature_enabled(FeatureFlag.AGENT_LIMITS):
+        agent_limits_flag = getattr(FeatureFlag, "AGENT_LIMITS", None)
+        if agent_limits_flag is not None and not is_feature_enabled(agent_limits_flag):
             return
         
         # Get current agent count
@@ -530,19 +550,25 @@ class AgentService:
     
     async def _validate_agent_config(self, agent_data) -> None:
         """Validate agent configuration"""
+        config_obj = getattr(agent_data, "configuration", None)
+        config = config_obj.dict() if hasattr(config_obj, "dict") else (config_obj or {})
+
         # Validate LLM provider
         supported_providers = ["openai", "anthropic"]
-        if agent_data.llm_provider and agent_data.llm_provider not in supported_providers:
-            raise AgentValidationError(f"Unsupported LLM provider: {agent_data.llm_provider}")
+        llm_provider = config.get("llm_provider")
+        if llm_provider and llm_provider not in supported_providers:
+            raise AgentValidationError(f"Unsupported LLM provider: {llm_provider}")
         
         # Validate temperature
-        if agent_data.temperature is not None:
-            if not 0.0 <= agent_data.temperature <= 2.0:
+        temperature = config.get("temperature")
+        if temperature is not None:
+            if not 0.0 <= float(temperature) <= 2.0:
                 raise AgentValidationError("Temperature must be between 0.0 and 2.0")
         
         # Validate max_tokens
-        if agent_data.max_tokens is not None:
-            if not 1 <= agent_data.max_tokens <= 32000:
+        max_tokens = config.get("max_tokens")
+        if max_tokens is not None:
+            if not 1 <= int(max_tokens) <= 32000:
                 raise AgentValidationError("Max tokens must be between 1 and 32000")
     
     async def _check_agent_permissions(self, agent: AIAgent, user_id: UUID, action: str) -> None:
@@ -561,7 +587,7 @@ class AgentService:
             total_tokens_used=0,
             average_response_time=0.0,
             success_rate=1.0,
-            user_satisfaction=0.0,
+            user_satisfaction_score=0.0,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )

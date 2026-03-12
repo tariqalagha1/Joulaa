@@ -59,6 +59,9 @@
     "email": "Email",
     "emailOrUsername": "Email or Username",
     "password": "Password",
+    "emailPlaceholder": "Enter your email or username",
+    "passwordPlaceholder": "Enter your password",
+    "showPassword": "Show password",
     "confirmPassword": "Confirm Password",
     "username": "Username",
     "fullName": "Full Name",
@@ -209,7 +212,6 @@
       "operations": "Operations",
       "custom": "Custom"
       }
-    }
   },
   "conversations": {
     "title": "Conversations",

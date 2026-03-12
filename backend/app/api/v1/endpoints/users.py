@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ....core.database import get_db
-from ....core.auth import get_current_user
+from ....core.auth_dependency import get_current_user
 from ....models.user import User
 from ....services.user_service import UserService
 from ....schemas.user import (

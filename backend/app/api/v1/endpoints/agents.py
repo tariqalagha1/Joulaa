@@ -15,12 +15,15 @@ from ....schemas.agent import (
 )
 from ....services.agent_service import AgentService
 from ....services.ai_service import ai_service
-from ....core.auth import get_current_user, get_current_organization
+from ....core.auth import get_current_organization
+from ....core.auth_dependency import get_current_user
 from ....core.feature_flags import is_feature_enabled, FeatureFlag
 from ....core.exceptions import (
     AgentNotFoundError, FeatureNotEnabledError, ValidationError
 )
+from ....core.audit import log_audit_event
 from ....models.user import User
+from ....core.tenant_guard import ensure_org_access
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -34,7 +37,7 @@ async def create_agent(
     organization_id: UUID = Depends(get_current_organization)
 ):
     """Create a new AI agent"""
-    if not is_feature_enabled(FeatureFlag.AI_AGENT_STUDIO):
+    if not is_feature_enabled(FeatureFlag.AGENT_STUDIO):
         raise FeatureNotEnabledError("AI Agent Studio")
     
     try:
@@ -48,8 +51,16 @@ async def create_agent(
         logger.info(
             "Agent created via API",
             agent_id=agent.id,
-            agent_name=agent.name,
+            agent_name=agent.name_ar or agent.name_en,
             created_by=current_user.id
+        )
+        log_audit_event(
+            event_type="agent.create",
+            user_id=current_user.id,
+            organization_id=organization_id,
+            resource_type="agent",
+            resource_id=agent.id,
+            metadata={"agent_type": str(agent.agent_type)},
         )
         
         return agent
@@ -72,8 +83,8 @@ async def list_agents(
     search: Optional[str] = Query(None, description="Search in name and description"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
     organization_id: UUID = Depends(get_current_organization)
 ):
     """List AI agents with filtering and pagination"""
@@ -119,6 +130,7 @@ async def get_agent(
             organization_id=organization_id,
             include_metrics=include_metrics
         )
+        ensure_org_access(getattr(agent, "organization_id", None), organization_id)
         
         return agent
         
@@ -198,6 +210,14 @@ async def delete_agent(
             deleted_by=current_user.id,
             force_delete=force
         )
+        log_audit_event(
+            event_type="agent.delete",
+            user_id=current_user.id,
+            organization_id=organization_id,
+            resource_type="agent",
+            resource_id=agent_id,
+            metadata={"force_delete": force},
+        )
         
         return {"message": "Agent deleted successfully", "success": success}
         
@@ -224,7 +244,8 @@ async def bulk_agent_operation(
     organization_id: UUID = Depends(get_current_organization)
 ):
     """Perform bulk operations on agents"""
-    if not is_feature_enabled(FeatureFlag.BULK_OPERATIONS):
+    bulk_flag = getattr(FeatureFlag, "BULK_OPERATIONS", None)
+    if bulk_flag is not None and not is_feature_enabled(bulk_flag):
         raise FeatureNotEnabledError("Bulk Operations")
     
     try:

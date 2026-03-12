@@ -6,6 +6,7 @@ export interface Integration {
   id: string
   organization_id: string
   integration_type: string
+  type?: string
   name: string
   description?: string
   configuration: Record<string, any>
@@ -59,6 +60,7 @@ export interface IntegrationStats {
   integrations_by_type: Record<string, number>
   recent_sync_errors: any[]
   sync_performance: Record<string, any>
+  error_integrations?: number
 }
 
 export interface IntegrationSyncResponse {
@@ -75,6 +77,8 @@ export interface IntegrationHealthCheck {
   error_message?: string
   checked_at: string
   details?: Record<string, any>
+  status?: string
+  message?: string
 }
 
 export interface IntegrationTestResponse {
@@ -96,10 +100,11 @@ class IntegrationService {
     health_status?: string
     sync_status?: string
     organization_id?: string
-    sort_by?: string
-    sort_order?: 'asc' | 'desc'
-    page?: number
-    page_size?: number
+  sort_by?: string
+  sort_order?: 'asc' | 'desc'
+  page?: number
+  page_size?: number
+  type?: string
   }): Promise<IntegrationListResponse> {
     const response: AxiosResponse<IntegrationListResponse> = await api.get(this.baseUrl, { params })
     return response.data
@@ -143,6 +148,10 @@ class IntegrationService {
   async healthCheckIntegration(integrationId: string): Promise<IntegrationHealthCheck> {
     const response: AxiosResponse<IntegrationHealthCheck> = await api.post(`${this.baseUrl}/${integrationId}/health-check`)
     return response.data
+  }
+
+  async healthCheck(integrationId: string): Promise<IntegrationHealthCheck> {
+    return this.healthCheckIntegration(integrationId)
   }
 
   // Test integration configuration

@@ -258,6 +258,17 @@ docker-compose up -d
 docker-compose logs -f
 ```
 
+### Local Dev (No Docker, conflict-safe ports)
+
+```bash
+# From repository root
+npm run dev:local
+```
+
+- Frontend: http://127.0.0.1:5174
+- Backend API: http://127.0.0.1:8002
+- Stop services: `npm run dev:stop`
+
 ### 4. Initialize Database
 
 ```bash

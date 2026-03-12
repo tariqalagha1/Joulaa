@@ -68,6 +68,13 @@ class AuthorizationError(JoulaaHTTPException):
         )
 
 
+class PermissionError(AuthorizationError):
+    """Backward-compatible generic permission error"""
+
+    def __init__(self, message: str = "Insufficient permissions", **kwargs):
+        super().__init__(message=message, **kwargs)
+
+
 class TokenExpiredError(AuthenticationError):
     """Token has expired"""
     
@@ -127,6 +134,18 @@ class OrganizationNotFoundError(JoulaaHTTPException):
         )
 
 
+class NotFoundError(JoulaaHTTPException):
+    """Backward-compatible generic not found error"""
+
+    def __init__(self, message: str = "Resource not found", **kwargs):
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message=message,
+            error_code="NOT_FOUND",
+            **kwargs
+        )
+
+
 class OrganizationLimitExceededError(JoulaaHTTPException):
     """Organization limit exceeded"""
     
@@ -135,6 +154,25 @@ class OrganizationLimitExceededError(JoulaaHTTPException):
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             message=message,
             error_code="ORGANIZATION_LIMIT_EXCEEDED",
+            **kwargs
+        )
+
+
+class OrganizationPermissionError(AuthorizationError):
+    """Organization permission denied"""
+
+    def __init__(self, message: str = "Organization access denied", **kwargs):
+        super().__init__(message=message, **kwargs)
+
+
+class OrganizationValidationError(JoulaaHTTPException):
+    """Organization validation failed"""
+
+    def __init__(self, message: str = "Organization validation failed", **kwargs):
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            message=message,
+            error_code="ORGANIZATION_VALIDATION_FAILED",
             **kwargs
         )
 
@@ -221,6 +259,30 @@ class ConversationPermissionError(JoulaaHTTPException):
             status_code=status.HTTP_403_FORBIDDEN,
             message=message,
             error_code="CONVERSATION_PERMISSION_DENIED",
+            **kwargs
+        )
+
+
+class ConversationValidationError(JoulaaHTTPException):
+    """Conversation validation failed"""
+
+    def __init__(self, message: str = "Conversation validation failed", **kwargs):
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            message=message,
+            error_code="CONVERSATION_VALIDATION_FAILED",
+            **kwargs
+        )
+
+
+class MessageNotFoundError(JoulaaHTTPException):
+    """Message not found"""
+
+    def __init__(self, message: str = "Message not found", **kwargs):
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message=message,
+            error_code="MESSAGE_NOT_FOUND",
             **kwargs
         )
 
@@ -337,6 +399,18 @@ class RateLimitExceededError(JoulaaHTTPException):
             message=message,
             error_code="RATE_LIMIT_EXCEEDED",
             headers=headers,
+            **kwargs
+        )
+
+
+class ConflictError(JoulaaHTTPException):
+    """Backward-compatible generic conflict error"""
+
+    def __init__(self, message: str = "Resource conflict", **kwargs):
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            message=message,
+            error_code="CONFLICT",
             **kwargs
         )
 

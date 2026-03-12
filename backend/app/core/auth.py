@@ -12,6 +12,7 @@ import structlog
 
 from .config import settings
 from ..database import get_db
+from ..models.organization import UserOrganization
 from ..models.user import User
 from .exceptions import (
     AuthenticationError, AuthorizationError, TokenExpiredError,
@@ -155,18 +156,37 @@ async def get_current_user(
 
 
 async def get_current_organization(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db),
 ) -> UUID:
-    """Get the current organization ID from token"""
+    """Get current organization ID from token, with legacy-token fallback."""
     try:
         payload = TokenManager.verify_token(credentials.credentials)
-        
-        if payload.get("type") != "access":
-            raise InvalidTokenError("Invalid token type")
-        
-        organization_id = UUID(payload.get("org_id"))
+
+        if payload.get("type") == "access" and payload.get("org_id"):
+            return UUID(payload.get("org_id"))
+
+        # Backward compatibility for legacy tokens that only include "sub".
+        user_id_raw = payload.get("sub")
+        if not user_id_raw:
+            raise InvalidTokenError("Missing subject in token")
+
+        user_id = UUID(user_id_raw)
+        membership_query = (
+            select(UserOrganization.organization_id)
+            .where(
+                UserOrganization.user_id == user_id,
+                UserOrganization.is_active == True,  # noqa: E712
+            )
+            .order_by(UserOrganization.joined_at.asc())
+            .limit(1)
+        )
+        membership_result = await db.execute(membership_query)
+        organization_id = membership_result.scalar_one_or_none()
+        if organization_id is None:
+            raise AuthenticationError("No active organization membership found")
         return organization_id
-        
+
     except (TokenExpiredError, InvalidTokenError):
         raise
     except Exception as e:

@@ -18,16 +18,16 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    port: 5174,
     host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:8002',
         changeOrigin: true,
         secure: false,
       },
       '/ws': {
-        target: 'ws://localhost:8000',
+        target: 'ws://localhost:8002',
         ws: true,
       },
     },

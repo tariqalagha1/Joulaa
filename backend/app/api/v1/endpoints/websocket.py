@@ -6,6 +6,7 @@ from typing import Optional
 
 from ....core.database import get_db
 from ....core.auth import get_user_from_token
+from ....core.auth_dependency import get_current_user
 from ....core.websocket import connection_manager, WebSocketHandler
 from ....models.user import User
 
@@ -112,7 +113,7 @@ async def websocket_chat_endpoint(
             
 @router.get("/connections")
 async def get_active_connections(
-    current_user: User = Depends(get_user_from_token)
+    current_user: User = Depends(get_current_user)
 ):
     """Get information about active WebSocket connections (admin only)"""
     if not current_user.is_admin:

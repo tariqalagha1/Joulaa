@@ -1,6 +1,5 @@
 """Database configuration and session management for Joulaa platform"""
 
-import asyncio
 from typing import AsyncGenerator, Optional
 from sqlalchemy.ext.asyncio import (
     AsyncSession, AsyncEngine, create_async_engine, async_sessionmaker
@@ -9,7 +8,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.pool import NullPool
 from sqlalchemy import (
     String, DateTime, Boolean, Text, Integer, Float, JSON,
-    func, event, Index
+    func, event, Index, text
 )
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
@@ -108,21 +107,25 @@ class DatabaseManager:
             return
         
         try:
+            database_url = settings.DATABASE_URL
+            if database_url.startswith("postgresql://"):
+                database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+            engine_kwargs = {
+                "echo": settings.DEBUG,
+                "pool_pre_ping": True,
+                "pool_recycle": 3600,
+            }
+            if settings.DEBUG:
+                engine_kwargs["poolclass"] = NullPool
+            else:
+                engine_kwargs["pool_size"] = 20
+                engine_kwargs["max_overflow"] = 30
+
             # Create async engine
             self.engine = create_async_engine(
-                settings.DATABASE_URL,
-                echo=settings.DEBUG,
-                pool_pre_ping=True,
-                pool_recycle=3600,  # Recycle connections every hour
-                pool_size=20,
-                max_overflow=30,
-                poolclass=NullPool if settings.DEBUG else None,
-                connect_args={
-                    "server_settings": {
-                        "application_name": settings.APP_NAME,
-                        "jit": "off",  # Disable JIT for better performance with many small queries
-                    }
-                }
+                database_url,
+                **engine_kwargs,
             )
             
             # Create session factory
@@ -136,7 +139,7 @@ class DatabaseManager:
             
             # Test connection
             async with self.engine.begin() as conn:
-                await conn.execute(func.select(1))
+                await conn.execute(text("SELECT 1"))
             
             self._initialized = True
             logger.info("Database initialized successfully")
@@ -194,15 +197,16 @@ db_manager = DatabaseManager()
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency to get database session"""
-    async with db_manager.get_session() as session:
+    session = await db_manager.get_session()
+    try:
         try:
             yield session
             await session.commit()
         except Exception:
             await session.rollback()
             raise
-        finally:
-            await session.close()
+    finally:
+        await session.close()
 
 
 async def get_db_session() -> AsyncSession:
@@ -217,8 +221,9 @@ class DatabaseHealthCheck:
     async def check_connection() -> bool:
         """Check if database connection is healthy"""
         try:
-            async with db_manager.get_session() as session:
-                await session.execute(func.select(1))
+            session = await db_manager.get_session()
+            async with session:
+                await session.execute(text("SELECT 1"))
                 return True
         except Exception as e:
             logger.error("Database health check failed", error=str(e))
@@ -228,14 +233,18 @@ class DatabaseHealthCheck:
     async def get_connection_info() -> dict:
         """Get database connection information"""
         try:
-            async with db_manager.get_session() as session:
+            session = await db_manager.get_session()
+            async with session:
                 result = await session.execute(
-                    func.select(
-                        func.version(),
-                        func.current_database(),
-                        func.current_user(),
-                        func.inet_server_addr(),
-                        func.inet_server_port()
+                    text(
+                        """
+                        SELECT
+                            version(),
+                            current_database(),
+                            current_user,
+                            inet_server_addr(),
+                            inet_server_port()
+                        """
                     )
                 )
                 row = result.first()

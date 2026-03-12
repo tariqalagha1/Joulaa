@@ -79,8 +79,9 @@ class AIAgent(Base):
     description_en = Column(Text, nullable=True, comment="Agent description in English")
     
     # Agent Configuration
-    agent_type = Column(SQLEnum(AgentType), nullable=False, index=True)
-    status = Column(SQLEnum(AgentStatus), default=AgentStatus.ACTIVE, index=True)
+    # Keep as String for compatibility with legacy DB schemas that don't have PG enum types.
+    agent_type = Column(String(100), nullable=False, index=True)
+    status = Column(String(50), default=AgentStatus.ACTIVE.value, index=True)
     capabilities = Column(JSONB, nullable=False, default=list, comment="List of agent capabilities")
     
     # AI Configuration

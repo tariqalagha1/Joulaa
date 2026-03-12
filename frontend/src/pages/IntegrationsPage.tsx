@@ -153,8 +153,9 @@ const IntegrationsPage: React.FC = () => {
     setSelectedIntegrations([])
   }
 
-  const getIntegrationIcon = (type: string) => {
-    switch (type.toLowerCase()) {
+  const getIntegrationIcon = (type?: string) => {
+    const normalizedType = (type || '').toLowerCase()
+    switch (normalizedType) {
       case 'sap':
         return <Database className="h-6 w-6" />
       case 'oracle':
@@ -522,9 +523,11 @@ const IntegrationsPage: React.FC = () => {
               </div>
 
               <div className="space-y-4">
-                {integrations.map((integration) => (
-                  <div
-                    key={integration.id}
+                {integrations.map((integration) => {
+                  const integrationTypeKey = integration.type || integration.integration_type || 'custom'
+                  return (
+                    <div
+                      key={integration.id}
                     className={`border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
                       selectedIntegrations.includes(integration.id) ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : ''
                     }`}
@@ -538,7 +541,7 @@ const IntegrationsPage: React.FC = () => {
                           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                         />
                         <div className="flex-shrink-0 text-gray-400">
-                          {getIntegrationIcon(integration.type)}
+                          {getIntegrationIcon(integrationTypeKey)}
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center space-x-3">
@@ -569,7 +572,7 @@ const IntegrationsPage: React.FC = () => {
                             </p>
                           )}
                           <div className="mt-2 flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
-                            <span>{t('integrations.type')}: {t(`integrations.types.${integration.type}`)}</span>
+                            <span>{t('integrations.type')}: {t(`integrations.types.${integrationTypeKey}`)}</span>
                             <span>{t('integrations.createdAt')}: {new Date(integration.created_at).toLocaleDateString()}</span>
                             {integration.last_sync_at && (
                               <span>{t('integrations.lastSync')}: {new Date(integration.last_sync_at).toLocaleDateString()}</span>
@@ -611,7 +614,8 @@ const IntegrationsPage: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           </div>

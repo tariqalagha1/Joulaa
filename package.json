@@ -10,6 +10,8 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:local": "bash scripts/dev-up.sh",
+    "dev:stop": "bash scripts/dev-down.sh",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:backend": "cd backend && npm run dev",
     "build": "npm run build:frontend && npm run build:backend",
@@ -29,10 +31,12 @@
     "docker:build": "docker-compose build"
   },
   "devDependencies": {
+    "@types/node": "^25.4.0",
+    "@types/react-syntax-highlighter": "^15.5.13",
     "concurrently": "^8.2.2",
-    "prettier": "^3.1.0",
     "husky": "^8.0.3",
-    "lint-staged": "^15.2.0"
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.1.0"
   },
   "engines": {
     "node": ">=18.0.0",
@@ -48,4 +52,4 @@
   ],
   "author": "Joulaa Team",
   "license": "MIT"
-} 
+}

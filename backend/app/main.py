@@ -11,7 +11,14 @@ from typing import Dict, Any
 from .core.config import settings
 from .core.database import init_db, close_db
 from .api.v1.api import api_router
+from .api.v2.orchestration import router as orchestration_v2_router
+from .api.v2.platform_access import router as platform_access_v2_router
 from .core.logging import setup_logging
+from .core.request_id import request_id_middleware
+from .core.rate_limit import limiter
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 # Setup structured logging
 setup_logging()
@@ -45,6 +52,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -59,6 +70,8 @@ app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=["*"] if settings.DEBUG else ["joulaa.app", "*.joulaa.app"]
 )
+
+app.middleware("http")(request_id_middleware)
 
 
 @app.middleware("http")
@@ -229,6 +242,8 @@ async def root() -> Dict[str, str]:
 
 # Include API routes
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(orchestration_v2_router, prefix="/api/v2", tags=["orchestration-v2"])
+app.include_router(platform_access_v2_router, prefix="/api/v2/admin", tags=["platform-access-v2"])
 
 
 if __name__ == "__main__":

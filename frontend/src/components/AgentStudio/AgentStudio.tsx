@@ -162,7 +162,7 @@ const CanvasNode: React.FC<{
 // Main Agent Studio component
 const AgentStudio: React.FC = () => {
   const { t } = useTranslation()
-  const canvasRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLDivElement | null>(null)
   const [flow, setFlow] = useState<AgentFlow>({
     id: 'new-flow',
     name: 'New Agent Flow',

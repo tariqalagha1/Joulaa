@@ -65,3 +65,7 @@ class UserOrganization(Base):
     
     def __repr__(self):
         return f"<UserOrganization(user_id={self.user_id}, organization_id={self.organization_id}, role={self.role})>"
+
+
+# Backward-compatible alias for services still importing the old membership model name.
+OrganizationMember = UserOrganization

@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import List, Optional
 import uuid
 import math
 
 from ....database import get_db
-from ....core.auth import get_current_user
+from ....core.auth_dependency import get_current_user
 from ....models.user import User
+from ....models.organization import UserOrganization
 from ....schemas.integration import (
     IntegrationCreate, IntegrationUpdate, IntegrationResponse,
     IntegrationDetailResponse, IntegrationListResponse, IntegrationStats,
@@ -18,8 +20,33 @@ from ....services.integration_service import IntegrationService
 from ....core.exceptions import (
     NotFoundError, ValidationError, PermissionError, ConflictError
 )
+from ....core.audit import log_audit_event
+from ....core.tenant_guard import ensure_org_access
 
 router = APIRouter()
+
+
+def _to_integration_response(integration) -> IntegrationResponse:
+    return IntegrationResponse(
+        id=integration.id,
+        organization_id=integration.organization_id,
+        integration_type=integration.integration_type,
+        name=integration.name,
+        description=integration.description,
+        configuration=integration.configuration,
+        is_active=integration.is_active,
+        health_check_url=integration.health_check_url,
+        metadata=integration.metadata_ or {},
+        sync_status=integration.sync_status,
+        sync_error=integration.sync_error,
+        last_sync_at=integration.last_sync_at,
+        health_status=integration.health_status,
+        last_health_check=integration.last_health_check,
+        created_at=integration.created_at,
+        updated_at=integration.updated_at,
+        created_by=integration.created_by,
+        updated_by=integration.updated_by,
+    )
 
 
 @router.get("/", response_model=IntegrationListResponse)
@@ -58,7 +85,7 @@ async def list_integrations(
         total_pages = math.ceil(total / page_size)
         
         return IntegrationListResponse(
-            integrations=[IntegrationResponse.from_orm(integration) for integration in integrations],
+            integrations=[_to_integration_response(integration) for integration in integrations],
             total=total,
             page=page,
             page_size=page_size,
@@ -85,7 +112,15 @@ async def create_integration(
     try:
         service = IntegrationService(db)
         integration = await service.create_integration(integration_data, current_user.id)
-        return IntegrationResponse.from_orm(integration)
+        log_audit_event(
+            event_type="integration.create",
+            user_id=current_user.id,
+            organization_id=integration.organization_id,
+            resource_type="integration",
+            resource_id=integration.id,
+            metadata={"integration_type": integration.integration_type},
+        )
+        return _to_integration_response(integration)
         
     except ValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -112,8 +147,19 @@ async def get_integration(
             current_user.id, 
             include_organization=include_organization
         )
+        membership_result = await db.execute(
+            select(UserOrganization.organization_id).where(
+                UserOrganization.user_id == current_user.id,
+                UserOrganization.organization_id == integration.organization_id,
+                UserOrganization.is_active == True
+            )
+        )
+        ensure_org_access(
+            integration.organization_id,
+            membership_result.scalar_one_or_none()
+        )
         
-        response_data = IntegrationResponse.from_orm(integration).dict()
+        response_data = _to_integration_response(integration).dict()
         response_data.update({
             "display_name": integration.display_name,
             "is_healthy": integration.is_healthy,
@@ -141,7 +187,7 @@ async def update_integration(
     try:
         service = IntegrationService(db)
         integration = await service.update_integration(integration_id, update_data, current_user.id)
-        return IntegrationResponse.from_orm(integration)
+        return _to_integration_response(integration)
         
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -165,7 +211,16 @@ async def delete_integration(
     """Delete integration"""
     try:
         service = IntegrationService(db)
+        integration = await service.get_integration(integration_id, current_user.id)
         await service.delete_integration(integration_id, current_user.id, soft_delete=soft_delete)
+        log_audit_event(
+            event_type="integration.delete",
+            user_id=current_user.id,
+            organization_id=integration.organization_id,
+            resource_type="integration",
+            resource_id=integration_id,
+            metadata={"soft_delete": soft_delete},
+        )
         
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

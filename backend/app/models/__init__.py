@@ -4,6 +4,9 @@ from .organization import Organization, UserOrganization
 from .agent import AIAgent, AgentMetrics, AgentTemplate, AgentWorkflow
 from .conversation import Conversation, Message
 from .integration import Integration
+from .audit_event import AuditEvent
+from .external_api_setting import ExternalAPISetting
+from .platform_api_key import PlatformAPIKey
 
 __all__ = [
     "User",
@@ -15,5 +18,8 @@ __all__ = [
     "AgentWorkflow",
     "Conversation",
     "Message",
-    "Integration"
+    "Integration",
+    "AuditEvent",
+    "ExternalAPISetting",
+    "PlatformAPIKey",
 ]

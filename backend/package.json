@@ -4,9 +4,9 @@
   "description": "Joulaa Backend - FastAPI with AI Integration",
   "private": true,
   "scripts": {
-    "dev": "uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
-    "start": "uvicorn app.main:app --host 0.0.0.0 --port 8000",
-    "build": "python -m pip install -r requirements.txt",
+    "dev": "venv/bin/uvicorn app.main:app --reload --host 127.0.0.1 --port 8002",
+    "start": "venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8002",
+    "build": "python3 -m pip install -r requirements.txt",
     "test": "pytest",
     "test:coverage": "pytest --cov=app --cov-report=html",
     "lint": "flake8 app tests",

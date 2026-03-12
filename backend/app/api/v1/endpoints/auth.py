@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from typing import Dict, Any
@@ -10,9 +10,11 @@ from ....core.security import (
     create_access_token, 
     create_refresh_token,
     validate_arabic_password,
-    get_password_hash,
-    get_current_user
+    get_password_hash
 )
+from ....core.auth_dependency import get_current_user
+from ....core.audit import log_audit_event
+from ....core.rate_limit import limiter
 from ....models.user import User
 from ....schemas.auth import (
     TokenResponse,
@@ -27,7 +29,10 @@ router = APIRouter()
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
+    response: Response,
     user_credentials: UserLogin,
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
@@ -64,6 +69,14 @@ async def login(
         refresh_token = create_refresh_token(data={"sub": str(user.id)})
         
         logger.info("User logged in successfully", user_id=user.id)
+        log_audit_event(
+            event_type="auth.login.success",
+            user_id=user.id,
+            organization_id=None,
+            resource_type="user",
+            resource_id=user.id,
+            metadata={"login_identifier": user_credentials.email_or_username},
+        )
         
         return {
             "access_token": access_token,
@@ -217,12 +230,12 @@ async def refresh_token(
 
 @router.post("/logout")
 async def logout(
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ) -> Dict[str, str]:
     """User logout"""
     try:
         # In a real implementation, you might want to blacklist the token
-        logger.info("User logged out", user_id=current_user["user_id"])
+        logger.info("User logged out", user_id=current_user.id)
         return {"message": "تم تسجيل الخروج بنجاح"}
         
     except Exception as e:
@@ -236,12 +249,12 @@ async def logout(
 @router.post("/change-password")
 async def change_password(
     password_data: PasswordChange,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, str]:
     """Change user password with Arabic validation"""
     try:
-        user = db.query(User).filter(User.id == current_user["user_id"]).first()
+        user = db.query(User).filter(User.id == current_user.id).first()
         
         if not verify_password(password_data.current_password, user.password_hash):
             raise HTTPException(
@@ -301,12 +314,12 @@ async def forgot_password(
 
 @router.get("/me")
 async def get_current_user_info(
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """Get current user information"""
     try:
-        user = db.query(User).filter(User.id == current_user["user_id"]).first()
+        user = db.query(User).filter(User.id == current_user.id).first()
         
         return {
             "id": str(user.id),
