@@ -1,202 +1,150 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '../../contexts/AuthContext'
 import { Link } from 'react-router-dom'
 import {
-  Bot,
-  MessageSquare,
-  Users,
+  Activity,
   BarChart3,
-  TrendingUp,
-  Clock,
+  Bot,
   CheckCircle,
-  AlertCircle,
-  Plus
+  Clock,
+  MessageSquare,
+  Plus,
+  TrendingUp,
+  Users,
+  AlertTriangle
 } from 'lucide-react'
+import { useAuth } from '../../contexts/AuthContext'
+import Card from '../ui/Card'
+import PageHeader from '../ui/PageHeader'
+import Button from '../ui/Button'
 
 const DashboardOverview: React.FC = () => {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { user } = useAuth()
 
-  // Mock data for dashboard stats
   const stats = [
-    {
-      name: 'إجمالي الوكلاء',
-      value: '12',
-      change: '+2',
-      changeType: 'increase',
-      icon: Bot,
-      href: '/dashboard/agents'
-    },
-    {
-      name: 'المحادثات النشطة',
-      value: '48',
-      change: '+12%',
-      changeType: 'increase',
-      icon: MessageSquare,
-      href: '/dashboard/conversations'
-    },
-    {
-      name: 'المستخدمون',
-      value: '156',
-      change: '+8',
-      changeType: 'increase',
-      icon: Users,
-      href: '/dashboard/organization'
-    },
-    {
-      name: 'معدل النجاح',
-      value: '94%',
-      change: '+2%',
-      changeType: 'increase',
-      icon: BarChart3,
-      href: '/dashboard/analytics'
-    }
+    { name: i18n.language === 'ar' ? 'إجمالي الوكلاء' : 'Total Agents', value: '12', change: '+2', icon: Bot, href: '/dashboard/agents' },
+    { name: i18n.language === 'ar' ? 'المحادثات النشطة' : 'Active Conversations', value: '48', change: '+12%', icon: MessageSquare, href: '/dashboard/conversations' },
+    { name: i18n.language === 'ar' ? 'المستخدمون' : 'Users', value: '156', change: '+8', icon: Users, href: '/dashboard/organization' },
+    { name: i18n.language === 'ar' ? 'معدل النجاح' : 'Success Rate', value: '94%', change: '+2%', icon: BarChart3, href: '/dashboard/integrations' }
   ]
 
   const recentActivities = [
     {
       id: 1,
-      type: 'agent_created',
-      message: 'تم إنشاء وكيل جديد: مساعد خدمة العملاء',
-      time: 'منذ ساعتين',
-      icon: Bot,
-      status: 'success'
-    },
-    {
-      id: 2,
-      type: 'conversation_completed',
-      message: 'تم إكمال 15 محادثة بنجاح',
-      time: 'منذ 4 ساعات',
+      message: i18n.language === 'ar' ? 'تم إنشاء وكيل جديد لخدمة العملاء.' : 'A new customer support agent was created.',
+      time: i18n.language === 'ar' ? 'منذ ساعتين' : '2 hours ago',
       icon: CheckCircle,
       status: 'success'
     },
     {
+      id: 2,
+      message: i18n.language === 'ar' ? 'تمت مزامنة تكاملات المؤسسة بنجاح.' : 'Organization integrations synced successfully.',
+      time: i18n.language === 'ar' ? 'منذ 4 ساعات' : '4 hours ago',
+      icon: Activity,
+      status: 'neutral'
+    },
+    {
       id: 3,
-      type: 'integration_warning',
-      message: 'تحذير: بطء في الاستجابة من API الخارجي',
-      time: 'منذ 6 ساعات',
-      icon: AlertCircle,
+      message: i18n.language === 'ar' ? 'هناك بطء في أحد مصادر البيانات الخارجية.' : 'One external data source is responding slowly.',
+      time: i18n.language === 'ar' ? 'منذ 6 ساعات' : '6 hours ago',
+      icon: AlertTriangle,
       status: 'warning'
     }
   ]
 
   return (
-    <div className="p-6">
-      {/* Welcome Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-secondary-900">
-          {t('dashboard.welcome')}
-        </h1>
-        {user && (
-          <p className="text-lg text-secondary-600 mt-2">
-            مرحباً {user.full_name_ar || user.full_name_en || user.username}
-          </p>
-        )}
-      </div>
+    <div>
+      <PageHeader
+        title={t('dashboard.welcome')}
+        subtitle={
+          user
+            ? `${i18n.language === 'ar' ? 'مرحباً' : 'Welcome'}, ${user.full_name_ar || user.full_name_en || user.username}`
+            : i18n.language === 'ar'
+              ? 'لوحة تشغيل موحدة لمراقبة وكلائك الذكيين.'
+              : 'A unified control center for your AI operations.'
+        }
+        action={
+          <Link to="/dashboard/agent-studio">
+            <Button className="gap-2">
+              <Plus size={16} />
+              {i18n.language === 'ar' ? 'وكيل جديد' : 'New Agent'}
+            </Button>
+          </Link>
+        }
+      />
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((stat) => {
           const Icon = stat.icon
           return (
-            <Link
-              key={stat.name}
-              to={stat.href}
-              className="bg-white rounded-lg shadow-sm border border-secondary-200 p-6 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-secondary-600">{stat.name}</p>
-                  <p className="text-2xl font-bold text-secondary-900 mt-1">{stat.value}</p>
-                  <div className="flex items-center mt-2">
-                    <TrendingUp className="h-4 w-4 text-green-500 ml-1" />
-                    <span className="text-sm text-green-600">{stat.change}</span>
+            <Link key={stat.name} to={stat.href}>
+              <Card className="card-hover h-full">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm text-slate-600">{stat.name}</p>
+                    <p className="mt-2 text-3xl font-bold text-slate-900">{stat.value}</p>
+                    <p className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-emerald-600">
+                      <TrendingUp size={14} />
+                      {stat.change}
+                    </p>
                   </div>
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                    <Icon size={20} />
+                  </span>
                 </div>
-                <div className="p-3 bg-primary-50 rounded-lg">
-                  <Icon className="h-6 w-6 text-primary-600" />
-                </div>
-              </div>
+              </Card>
             </Link>
           )
         })}
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Quick Actions */}
-        <div className="bg-white rounded-lg shadow-sm border border-secondary-200 p-6">
-          <h2 className="text-lg font-semibold text-secondary-900 mb-4">إجراءات سريعة</h2>
-          <div className="space-y-3">
-            <Link
-              to="/dashboard/agent-studio"
-              className="flex items-center p-3 rounded-lg border border-secondary-200 hover:bg-secondary-50 transition-colors"
-            >
-              <div className="p-2 bg-primary-50 rounded-lg ml-3">
-                <Plus className="h-5 w-5 text-primary-600" />
-              </div>
-              <div>
-                <p className="font-medium text-secondary-900">إنشاء وكيل جديد</p>
-                <p className="text-sm text-secondary-600">استخدم استوديو الوكلاء لبناء وكيل ذكي</p>
-              </div>
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <Card className="xl:col-span-2">
+          <h2 className="mb-4 text-lg font-semibold text-slate-900">{t('dashboard.quickActions')}</h2>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <Link to="/dashboard/agent-studio" className="rounded-xl border border-slate-200 p-4 transition hover:-translate-y-1 hover:bg-blue-50/60">
+              <h3 className="font-semibold text-slate-900">{i18n.language === 'ar' ? 'إنشاء وكيل' : 'Create Agent'}</h3>
+              <p className="mt-1 text-sm text-slate-600">{i18n.language === 'ar' ? 'ابدأ وكيل جديد عبر الاستوديو.' : 'Launch a new assistant from studio.'}</p>
             </Link>
-            <Link
-              to="/dashboard/chat"
-              className="flex items-center p-3 rounded-lg border border-secondary-200 hover:bg-secondary-50 transition-colors"
-            >
-              <div className="p-2 bg-green-50 rounded-lg ml-3">
-                <MessageSquare className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <p className="font-medium text-secondary-900">بدء محادثة جديدة</p>
-                <p className="text-sm text-secondary-600">تفاعل مع الوكلاء الذكيين</p>
-              </div>
-            </Link>
-            <Link
-              to="/dashboard/integrations"
-              className="flex items-center p-3 rounded-lg border border-secondary-200 hover:bg-secondary-50 transition-colors"
-            >
-              <div className="p-2 bg-blue-50 rounded-lg ml-3">
-                <BarChart3 className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="font-medium text-secondary-900">إعداد التكاملات</p>
-                <p className="text-sm text-secondary-600">ربط الأنظمة الخارجية</p>
-              </div>
+            <Link to="/dashboard/chat" className="rounded-xl border border-slate-200 p-4 transition hover:-translate-y-1 hover:bg-blue-50/60">
+              <h3 className="font-semibold text-slate-900">{i18n.language === 'ar' ? 'محادثة مباشرة' : 'Live Chat'}</h3>
+              <p className="mt-1 text-sm text-slate-600">{i18n.language === 'ar' ? 'اختبر الوكلاء في واجهة الدردشة.' : 'Test your agents in chat mode.'}</p>
             </Link>
           </div>
-        </div>
+        </Card>
 
-        {/* Recent Activity */}
-        <div className="bg-white rounded-lg shadow-sm border border-secondary-200 p-6">
-          <h2 className="text-lg font-semibold text-secondary-900 mb-4">النشاط الأخير</h2>
-          <div className="space-y-4">
+        <Card>
+          <h2 className="mb-4 text-lg font-semibold text-slate-900">{t('dashboard.recentActivity')}</h2>
+          <div className="space-y-3">
             {recentActivities.map((activity) => {
               const Icon = activity.icon
               return (
-                <div key={activity.id} className="flex items-start">
-                  <div className={`p-2 rounded-lg ml-3 ${
-                    activity.status === 'success' ? 'bg-green-50' :
-                    activity.status === 'warning' ? 'bg-yellow-50' : 'bg-red-50'
-                  }`}>
-                    <Icon className={`h-4 w-4 ${
-                      activity.status === 'success' ? 'text-green-600' :
-                      activity.status === 'warning' ? 'text-yellow-600' : 'text-red-600'
-                    }`} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-secondary-900">{activity.message}</p>
-                    <div className="flex items-center mt-1">
-                      <Clock className="h-3 w-3 text-secondary-400 ml-1" />
-                      <span className="text-xs text-secondary-500">{activity.time}</span>
-                    </div>
+                <div key={activity.id} className="flex items-start gap-3 rounded-xl border border-slate-200/70 p-3">
+                  <span
+                    className={`mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-lg ${
+                      activity.status === 'success'
+                        ? 'bg-emerald-50 text-emerald-600'
+                        : activity.status === 'warning'
+                          ? 'bg-amber-50 text-amber-600'
+                          : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    <Icon size={16} />
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">{activity.message}</p>
+                    <p className="mt-1 inline-flex items-center gap-1 text-xs text-slate-500">
+                      <Clock size={12} />
+                      {activity.time}
+                    </p>
                   </div>
                 </div>
               )
             })}
           </div>
-        </div>
-      </div>
+        </Card>
+      </section>
     </div>
   )
 }
